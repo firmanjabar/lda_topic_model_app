@@ -64,9 +64,32 @@ def simple_tokenize(text: str, lowercase=True, rm_digits=True, rm_punct=True, mi
     return toks
 
 def build_bigrams(tokens_list, threshold=10, min_count=5):
-    phrases = Phrases(tokens_list, min_count=min_count, threshold=threshold, delimiter=b'_')
-    bigram = Phraser(phrases)
-    return [bigram[doc] for doc in tokens_list]
+    """
+    Build phraser safely across Python 3.12+/3.13 and gensim 4.x.
+    - Ensure tokens are str
+    - Use string delimiter (NOT bytes)
+    - Graceful fallback if training fails
+    """
+    # coerce any non-str tokens to str
+    tokens_list = [[t if isinstance(t, str) else str(t) for t in doc] for doc in tokens_list]
+
+    if not tokens_list or all(len(doc) == 0 for doc in tokens_list):
+        return tokens_list  # nothing to do
+
+    try:
+        phrases = Phrases(
+            tokens_list,
+            min_count=int(min_count),
+            threshold=float(threshold),
+            delimiter="_",      # <-- string delimiter fixes the TypeError
+        )
+        bigram = Phraser(phrases)
+        return [bigram[doc] for doc in tokens_list]
+    except Exception as e:
+        # Fallback: return original tokens if phrase builder fails
+        # (you may st.warning(f"Bigram disabled: {e}") if you want)
+        return tokens_list
+
 
 # ---------------- UI ----------------
 st.title("🧵 LDA Topic Modeling — Bahasa Indonesia & English")
